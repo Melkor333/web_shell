@@ -1,18 +1,16 @@
 <!doctype html>
 <head>
-<script type="module">
-    function main() {
-        document.getElementById("prompt").addEventListener("submit", handleSubmit);
+<script>
         document.getElementById("command").addEventListener('keypress', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
-                handleSubmit(e);
+                handleSubmit();
             }
         });
         document.addEventListener('keydown', function (e) {
             // Ctrl keys seem to only work with keydown
             // TODO: Only if currently running a command
             if (e.key === 'c' && e.ctrlKey) {
-                handleCancel(e);
+                handleCancel();
             }
         });
         document.getElementById("log").addEventListener("dblclick", function(e) {
@@ -23,14 +21,12 @@
                 }
             }
         })
-    }
 
-    async function handleSubmit(event) {
-        event.preventDefault();
+    function handleSubmit() {
         const commandEl = document.getElementById("command");
         const command = commandEl.value;
         if (!command) {
-            return
+            return false
         }
 
         let wrapper = createLogElement(command);
@@ -47,21 +43,64 @@
         } catch (error) {
             console.error(error);
             commandEl.disabled = false;
-            return
+            return false
+        }
+        return false
+    }
+    
+    function handleComplete() {
+        const commandEl = document.getElementById("command");
+        const command = commandEl.value;
+        if (!command) {
+            return false
         }
 
-        updateLogElement(wrapper, json);
+        let wrapper = createLogElement(command);
 
-        document.getElementById("dir").textContent = json.Dir
+        //commandEl.value = "";
+        //commandEl.disabled = true;
+        let json;
+        try {
+            const resp = await fetch("/complete", {
+                method: "POST",
+                body: command,
+            });
+            json = await resp.json();
+        } catch (error) {
+            console.error(error);
+            //commandEl.disabled = false;
+            return false
+        }
 
-        commandEl.disabled = false;
-        commandEl.focus()
-        document.scrollingElement.scrollTop = document.scrollingElement.scrollHeight;
+        updateCompletionElement(wrapper, json);
+
+        //document.getElementById("dir").textContent = json.Dir
+
+        //commandEl.disabled = false;
+        //commandEl.focus()
+        //document.scrollingElement.scrollTop = document.scrollingElement.scrollHeight;
+        return false
     }
 
     function createLogElement(command) {
         // Yuck
         const logEl = document.getElementById("log");
+        let wrapperEl = document.createElement("details");
+
+        const summaryEl = document.createElement("summary");
+        let codeEl = document.createElement("code");
+        logEl.append(wrapperEl);
+        wrapperEl.append(summaryEl);
+        summaryEl.append(codeEl);
+        codeEl.textContent = command;
+
+        return wrapperEl;
+    }
+
+    function createCompletionElement(command) {
+        // Yuck
+        const logEl = document.getElementById("completion");
+        logEl.innerHTML = "";
         let wrapperEl = document.createElement("details");
 
         const summaryEl = document.createElement("summary");
@@ -103,13 +142,41 @@
         console.log(resp);
     }
 
-    async function handleCancel(event) {
+    function updateCompletionElement(wrapper, resp) {
+        wrapper.open = true;
+        if (resp.Err) {
+            wrapper.className = "failed";
+        }
+
+        function addHtml(className, value) {
+            if (value) {
+                // TODO: for-loop each elem
+                let div = document.createElement("div");
+                div.classList.add("completion-container");
+                div.classList.add(className);
+                div.innerHTML = value;
+                wrapper.append(div);
+            }
+        }
+        function addPre(className, value) {
+            if (value) {
+                let pre = document.createElement("pre");
+                pre.className = className;
+                pre.textContent = value;
+                wrapper.append(pre);
+            }
+        }
+        addHtml("stdout", resp.Stdout)
+        addPre("stderr", resp.Stderr)
+        addPre("err", resp.Err && resp.Err.Text)
+        console.log(resp);
+    }
+    
+    function handleCancel() {
         await fetch("/cancel", {
             method: "POST",
         });
     }
-
-    window.onload = main;
 </script>
 <link href="terminal.css" rel="stylesheet">
 <style>
@@ -143,6 +210,8 @@
     <div id="dir"></div>
     <form id="prompt">
         <textarea name="command" id="command"></textarea>
-        <button type="submit">Run</button>
+        <button type="submit" onClick="handleSubmit()">Run</button>
+        <button type="submit" onclick="handleComplete()">Complete</button>
     </form>
+    <div id="completion"></div>
 </body>
