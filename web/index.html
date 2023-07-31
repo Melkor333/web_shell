@@ -5,7 +5,10 @@
         document.getElementById("prompt").addEventListener("submit", handleSubmit);
         document.getElementById("command").addEventListener('keypress', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
-                handleSubmit(e);
+                handleComplete(e);
+            }
+            if (e.key === 't' && !e.shiftKey) {
+                handleComplete(e);
             }
         });
         document.addEventListener('keydown', function (e) {
@@ -14,7 +17,7 @@
             if (e.key === 'c' && e.ctrlKey) {
                 handleCancel(e);
             }
-            if (e.key === 'Tab' && !e.shiftKey) {
+            if (e.key === 't' && !e.shiftKey) {
                 handleComplete(e);
             }
         });

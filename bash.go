@@ -46,7 +46,7 @@ type BashShell struct {
 func NewBashShell() (*BashShell, error) {
 	shell := &BashShell{}
 
-	shell.cmd = exec.Command(*shellPath, "--login", "-i", *shellScript)
+	shell.cmd = exec.Command(*shellPath, "--norc", "--login", "-i", *shellScript)
 	// Can't use setsid here. If bash is a session leader, then the operating
 	// system will allocate any non-controlling terminal it opens as the
 	// controlling terminal of that session. More concretely, if we call StdIO()
@@ -92,7 +92,7 @@ func (b *BashShell) readLoop() {
 		// TODO: We can end up getting stuck looping on this error. Limit retries or ignore this "element"
 		if err != nil {
 			log.Println(err)
-			continue
+			return
 		}
 
 		log.Printf("Parsed Message: %+v", m)

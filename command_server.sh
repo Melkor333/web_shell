@@ -127,7 +127,8 @@ __cmd_complete() {
     local prog="${1%% *}"
     if [[ "${#1}" -gt "${#prog}" ]]; then
         # argument parsing
-        comp_command="$(complete -p "$prog" | sed s/^complete/compgen/)"
+        comp_command="$(complete -p "$prog")"
+        comp_command="${comp_command/complete/compgen}" # TODO can't complete "complete" :)
         if [[ -z "$comp_command" ]]; then
             compgen_out=""
         else
