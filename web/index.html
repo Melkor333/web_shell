@@ -1,6 +1,7 @@
 <!doctype html>
 <head>
 <script type="module" src="assets/shell.js"></script>
+<link href="assets/shell.css" rel="stylesheet">
 <link href="terminal.css" rel="stylesheet">
 <style>
     details.failed {
@@ -32,7 +33,10 @@
 </style>
 </head>
 <body>
-    <div id="log"></div>
-    <div id="dir"></div>
-    <div id="prompt"></div>
+<div id="wrapper">
+  <ul id="menuContainer">
+    <li id="addMenuItem">Add another component</li>
+  </ul>
+  <div id="layoutContainer"></div>
+</div> 
 </body>

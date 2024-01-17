@@ -1,4 +1,3 @@
-//go:generate npm install
 // Prototype Shell UI, for the Go sh package and external shell interpreters.
 //
 // Each command is allocated a pty for stdout and a (named) pipe for stderr.
@@ -13,6 +12,8 @@
 //
 // Apparently according to POSIX, stderr is supposed to be open for both
 // reading and writing...
+//
+//go:generate npm install
 package main
 
 import (
@@ -34,11 +35,11 @@ import (
 )
 
 var (
-	host = flag.String("host", "localhost", "Hostname at which to run the server")
-	port = flag.Int("port", 3000, "Port at which to run the server over HTTP")
-	gosh = flag.Bool("gosh", false, "Use the sh package instead of bash")
-	oil  = flag.Bool("oil", false, "Use oil instead of bash")
-	fifo = flag.Bool("fifo", true, "Use named fifo instead of anonymous pipe")
+	host  = flag.String("host", "localhost", "Hostname at which to run the server")
+	port  = flag.Int("port", 3000, "Port at which to run the server over HTTP")
+	gosh  = flag.Bool("gosh", false, "Use the sh package instead of bash")
+	oil   = flag.Bool("oil", false, "Use oil instead of bash")
+	fifo  = flag.Bool("fifo", true, "Use named fifo instead of anonymous pipe")
 	debug = flag.Bool("debug", false, "Watch and live reload typescript")
 	build = flag.Bool("buildonly", false, "build the typescript and exit")
 )
@@ -92,7 +93,12 @@ func main() {
 		Bundle:      true,
 		Outfile:     "web/assets/shell.js",
 		LogLevel:    api.LogLevelInfo,
-		Write:	     true,
+		//Plugins:     []api.Plugin{inlineImages},
+		Sourcemap: api.SourceMapInline,
+		Write:     true,
+		Loader: map[string]api.Loader{
+			".png": api.LoaderDataURL,
+		},
 	})
 	// build a first time so even -debug -build works
 	result := buildCtx.Rebuild()
