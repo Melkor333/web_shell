@@ -1,2 +1,4 @@
 node_modules
 web/assets
+lib/inject_tcsetpgrp.so
+/web_shell

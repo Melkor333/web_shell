@@ -1,3 +1,4 @@
+import { JsonValue } from "golden-layout";
 import "golden-layout/dist/css/goldenlayout-base.css";
 import "golden-layout/dist/css/themes/goldenlayout-light-theme.css";
 import { ComponentContainer, LayoutConfig, GoldenLayout } from "golden-layout/src/index";
@@ -14,32 +15,38 @@ interface error {
     Text: string
 }
 
-
 /* COMMANDS */
-
 export interface TerminalCommand {
     /** Abstract "Commands" which the terminal exposes and can be run */
     (command: string, output: CommandOut): void
 }
 
-/* WIDGET */
-export abstract class Widget implements GoldenLayout.ComponentConstructor {
-    /** Widgets which have graphical UI and can be placed. */
-    rootElement: HTMLElement;
-    name: string;
-
-    defaultHTML = '<h2>' + 'My Widget' + '</h2>'
-
-    abstract init(): void;
-
-    constructor(public container: ComponentContainer) {
-        this.rootElement = container.element;
-        this.rootElement.innerHTML = this.defaultHTML;
-        //this.resizeWithContainerAutomatically = true;
-        this.init();
-    }
+interface Widget extends GoldenLayout.VirtuableComponent {
+    term: Terminal;
 }
 
+interface WidgetConstructor extends GoldenLayout.ComponentConstructor {
+    new(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean): Widget;
+}
+
+/* WIDGET */
+export abstract class BaseWidget implements Widget {
+    /** Widgets which have graphical UI and can be placed. */
+    rootHtmlElement: HTMLElement;
+    name?: string;
+    state: JsonValue;
+    virtual?: Boolean;
+    term: Terminal;
+    container: ComponentContainer;
+
+    constructor(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean) {
+        this.rootHtmlElement = container.element;
+        this.container = container;
+        this.state = state;
+        this.term = term;
+        this.virtual = virtual;
+    }
+}
 
 const defaultLayout: LayoutConfig = {
     root: {
@@ -47,22 +54,27 @@ const defaultLayout: LayoutConfig = {
         content: [],
     }
 };
+
 export class Terminal {
     layout: LayoutConfig;
     goldenLayout: GoldenLayout;
+    id: string;
 
     constructor(public layoutElement: HTMLElement, layout: LayoutConfig = defaultLayout,) {
-        this.goldenLayout = new GoldenLayout(layout, layoutElement);
+        this.goldenLayout = new GoldenLayout(layoutElement);
+        this.goldenLayout.loadLayout(layout);
+        this.id = "ID";
     }
 
-    //registerMenu(el);
-
-    registerWidget(widget: Widget) {
-        this.goldenLayout.registerComponent(widget.name, widget);
+    registerWidget(widget: WidgetConstructor) {
+        var that = this;
+        this.goldenLayout.registerComponentFactoryFunction(widget.name, (container, state, virtual) => {
+            return new widget(that, container, state, virtual);
+        });
     };
 
-    addWidget(name: String) {
-        this.goldenLayout.addComponent(name, undefined, 'Added Component');
+    addWidget(name: string) {
+        this.goldenLayout.addComponent(name, undefined, name);
     }
 
     init() {

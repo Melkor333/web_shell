@@ -1,4 +1,6 @@
 import { EditorState } from "@codemirror/state"
+import { JsonValue } from "golden-layout";
+import { ComponentContainer } from "golden-layout/src/index";
 import { EditorView, KeyBinding, keymap } from "@codemirror/view"
 import { basicSetup } from "codemirror"
 import { defaultKeymap, insertNewline } from "@codemirror/commands"
@@ -11,7 +13,7 @@ import {
 
 import { CompletionContext, autocompletion, moveCompletionSelection } from "@codemirror/autocomplete"
 //import {cancelComplete, complete, submit, Log} from "./web_shell"
-import { Widget } from "./web_shell";
+import { BaseWidget, Terminal } from "./web_shell";
 
 function handleSubmit(view: EditorView, log: Log): boolean {
     const command = view.state.doc.toString()
@@ -40,12 +42,13 @@ async function shellComplete(context: CompletionContext) {
 
 let readonly = false
 
-export class CodemirrorWidget extends Widget {
+export class CodemirrorWidget extends BaseWidget {
     name = "CodemirrorWidget";
-    view;
+    view: EditorView;
 
-    init() {
-        let el = this.rootElement;
+    constructor(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean) {
+        super(term, container, state, virtual);
+        let el = this.rootHtmlElement;
         let webshellCompletion = autocompletion({
             override: [shellComplete],
         })
@@ -66,7 +69,7 @@ export class CodemirrorWidget extends Widget {
         }
 
         let startState = EditorState.create({
-            doc: "",
+            doc: this.term.id,
             extensions: [
                 keymap.of([runCommand, runComplete]),
                 keymap.of(defaultKeymap),
