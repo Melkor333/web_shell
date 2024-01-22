@@ -64,13 +64,17 @@ export class Terminal {
     promptListeners: ((n: string) => string | undefined)[];
 
     constructor(public layoutElement: HTMLElement, layout: LayoutConfig = defaultLayout,) {
-        this.goldenLayout = new GoldenLayout(layoutElement);
-        this.goldenLayout.loadLayout(layout);
-        this.id = "ID";
+        // TODO: Maybe this needs some decoupling. E.g. Pass in the Layout. Allow multiple Terms in the same layout, etc.?
+        var goldenLayout = new GoldenLayout(layoutElement);
+        goldenLayout.loadLayout(layout);
+        goldenLayout.setSize(100, 100);
+        this.goldenLayout = goldenLayout;
+        this.id = "ID"; // TODO: for later use when there might be multiple terminals?
         this.promptListeners = [];
         this.prompt = "";
     }
 
+    // Include a wrapper which links the Terminal
     registerWidget(widget: WidgetConstructor) {
         var that = this;
         this.goldenLayout.registerComponentFactoryFunction(widget.name, (container, state, virtual) => {
