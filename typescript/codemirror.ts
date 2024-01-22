@@ -1,7 +1,7 @@
 import { EditorState } from "@codemirror/state"
 import { JsonValue } from "golden-layout";
 import { ComponentContainer } from "golden-layout/src/index";
-import { EditorView, KeyBinding, keymap } from "@codemirror/view"
+import { ViewPlugin, ViewUpdate, EditorView, KeyBinding, keymap } from "@codemirror/view"
 import { basicSetup } from "codemirror"
 import { defaultKeymap, insertNewline } from "@codemirror/commands"
 import { shell } from "@codemirror/legacy-modes/mode/shell"
@@ -31,7 +31,7 @@ function handleSubmit(view: EditorView, log: Log): boolean {
 }
 
 async function shellComplete(context: CompletionContext) {
-    context.addEventListener("abort", cancelComplete)
+    //context.addEventListener("abort", cancelComplete)
     const command = context.state.doc.toString()
     const pos = context.pos
     if (command.length == 0) {
@@ -41,6 +41,13 @@ async function shellComplete(context: CompletionContext) {
 }
 
 let readonly = false
+
+function updateInfo(term: Terminal) {
+    return EditorState.transactionExtender.of((update: ViewUpdate) => {
+        if (update.docChanged)
+            term.prompt = update.state.doc.toString()
+    })
+}
 
 export class CodemirrorWidget extends BaseWidget {
     name = "CodemirrorWidget";
@@ -69,7 +76,7 @@ export class CodemirrorWidget extends BaseWidget {
         }
 
         let startState = EditorState.create({
-            doc: this.term.id,
+            doc: this.term.prompt,
             extensions: [
                 keymap.of([runCommand, runComplete]),
                 keymap.of(defaultKeymap),
@@ -79,6 +86,7 @@ export class CodemirrorWidget extends BaseWidget {
                 StreamLanguage.define(shell),
                 basicSetup,
                 syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+                updateInfo(term)
             ]
         })
 

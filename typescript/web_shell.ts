@@ -21,21 +21,22 @@ export interface TerminalCommand {
     (command: string, output: CommandOut): void
 }
 
+// Extension to components with Terminalspecific addons
 interface Widget extends GoldenLayout.VirtuableComponent {
     term: Terminal;
 }
 
+// Constructor which also takes the terminal
 interface WidgetConstructor extends GoldenLayout.ComponentConstructor {
     new(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean): Widget;
 }
 
-/* WIDGET */
 export abstract class BaseWidget implements Widget {
     /** Widgets which have graphical UI and can be placed. */
     rootHtmlElement: HTMLElement;
-    name?: string;
+    name: string;
     state: JsonValue;
-    virtual?: Boolean;
+    virtual: Boolean;
     term: Terminal;
     container: ComponentContainer;
 
@@ -59,11 +60,15 @@ export class Terminal {
     layout: LayoutConfig;
     goldenLayout: GoldenLayout;
     id: string;
+    private p: string;
+    promptListeners: ((n: string) => string | undefined)[];
 
     constructor(public layoutElement: HTMLElement, layout: LayoutConfig = defaultLayout,) {
         this.goldenLayout = new GoldenLayout(layoutElement);
         this.goldenLayout.loadLayout(layout);
         this.id = "ID";
+        this.promptListeners = [];
+        this.prompt = "";
     }
 
     registerWidget(widget: WidgetConstructor) {
@@ -77,6 +82,24 @@ export class Terminal {
         this.goldenLayout.addComponent(name, undefined, name);
     }
 
+    addPromptListener(f: (n: string) => string) {
+        this.promptListeners.push(f);
+    }
+
+    get prompt() {
+        return this.p;
+    }
+
+    set prompt(n: string) {
+        var p = n;
+        for (const f of this.promptListeners) {
+            p = f(p);
+        }
+        if (p != this.p) {
+            this.p = p;
+        }
+    }
+
     init() {
         this.goldenLayout.init();
     }
@@ -86,7 +109,7 @@ export async function submit(command: string) {
     if (!command) {
         return;
     };
-    let json;
+    let json: JSON;
     try {
         const resp = await fetch("/run", {
             method: "POST",
