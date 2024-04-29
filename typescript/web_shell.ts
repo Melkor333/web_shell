@@ -5,20 +5,27 @@ import { ComponentContainer, LayoutConfig, GoldenLayout } from "golden-layout/sr
 
 // An already finished command
 export type CommandOut = {
-    Dir: string,
-    Stdout: string,
-    Stderr: string,
-    Err: error
+    Dir?: string,
+    Stdout?: string,
+    Stderr?: string,
+    Err?: error
+}
+
+export function TestCommandOut(json: any): json is CommandOut {
+    if ((json.hasOwnProperty('Dir') && typeof (json.Dir) == 'string') &&
+        // Only one of the two are required
+        ((json.hasOwnProperty('Stdout') && typeof (json.Stdout) == 'string') ||
+            (json.hasOwnProperty('Sterr') && typeof (json.Stderr) == 'string'))) {
+        return true;
+    }
+    if (json.hasOwnProperty('Err') && json.Err.hasOwnProperty('Text') && typeof (json.Err.Text) == 'string') {
+        return true;
+    }
+    return false;
 }
 
 interface error {
     Text: string
-}
-
-/* COMMANDS */
-export interface TerminalCommand {
-    /** Abstract "Commands" which the terminal exposes and can be run */
-    (command: string, output: CommandOut): void
 }
 
 // Extension to components with Terminalspecific addons
@@ -41,7 +48,10 @@ export abstract class BaseWidget implements Widget {
     container: ComponentContainer;
 
     constructor(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean) {
-        this.rootHtmlElement = container.element;
+        let d = document.createElement("div");
+        d.classList.add("widget-container");
+        container.element.append(d);
+        this.rootHtmlElement = d;
         this.container = container;
         this.state = state;
         this.term = term;
@@ -56,22 +66,45 @@ const defaultLayout: LayoutConfig = {
     }
 };
 
+interface AllTerminalListeners {
+    PromptUpdate: ((s: string) => string)[],
+    PreRun: (() => void)[],
+    PostRun: ((t: Terminal, i: number) => Boolean)[] // number is the index in the term.command[i] array. TODO: Replace with an UUID
+}
+
+type TerminalListeners = Partial<AllTerminalListeners>;
+
+export enum Command {
+    Run,
+}
+
+//type TerminalListener {
+//    (state): boolean // Boolean says if we should continue with other Listeners or not
+//}
+
 export class Terminal {
     layout: LayoutConfig;
     goldenLayout: GoldenLayout;
     id: string;
     private p: string;
     promptListeners: ((n: string) => string | undefined)[];
+    listeners: AllTerminalListeners;
+    commands: [string, CommandOut][];
 
     constructor(public layoutElement: HTMLElement, layout: LayoutConfig = defaultLayout,) {
         // TODO: Maybe this needs some decoupling. E.g. Pass in the Layout. Allow multiple Terms in the same layout, etc.?
+        this.listeners = {
+            PromptUpdate: [],
+            PreRun: [],
+            PostRun: []
+        }
         var goldenLayout = new GoldenLayout(layoutElement);
         goldenLayout.loadLayout(layout);
         goldenLayout.setSize(100, 100);
         this.goldenLayout = goldenLayout;
         this.id = "ID"; // TODO: for later use when there might be multiple terminals?
-        this.promptListeners = [];
         this.prompt = "";
+        this.commands = [];
     }
 
     // Include a wrapper which links the Terminal
@@ -86,8 +119,11 @@ export class Terminal {
         this.goldenLayout.addComponent(name, undefined, name);
     }
 
-    addPromptListener(f: (n: string) => string) {
-        this.promptListeners.push(f);
+    addListeners(listeners: TerminalListeners) { // TODO generics!
+        const that = this;
+        Object.entries(listeners).forEach((listeners, name) => {
+            that.listeners[listeners[0]].push(...listeners[1])
+        })
     }
 
     get prompt() {
@@ -96,7 +132,7 @@ export class Terminal {
 
     set prompt(n: string) {
         var p = n;
-        for (const f of this.promptListeners) {
+        for (const f of this.listeners.PromptUpdate) {
             p = f(p);
         }
         if (p != this.p) {
@@ -104,16 +140,40 @@ export class Terminal {
         }
     }
 
+    runCommand(command: Command) {
+        if (command === Command.Run) {
+            console.log("running command ", command)
+            return this.run()
+        }
+    }
+
+    // TODO: Make this a "generic" command
+    private run() {
+        const that = this;
+        const p = this.prompt;
+        if (!p) {
+            return;
+        }
+
+        submit(p).then((out) => {
+            var i = that.commands.push([p, out]) - 1;
+            for (const l of this.listeners.PostRun) {
+                console.log(l)
+                l(that, i)
+            }
+        })
+    }
+
     init() {
         this.goldenLayout.init();
     }
 }
 
-export async function submit(command: string) {
+export async function submit(command: string): Promise<CommandOut> {
     if (!command) {
         return;
     };
-    let json: JSON;
+    let json: string;
     try {
         const resp = await fetch("/run", {
             method: "POST",
@@ -124,7 +184,10 @@ export async function submit(command: string) {
         console.error(error);
         return;
     }
-    return json;
+    console.log(json)
+    //var out = JSON.parse(json)
+    if ((TestCommandOut(json))) { return json }
+    return { Err: { Text: "Bad data from backend" } };
 }
 
 export async function cancel() {
@@ -143,7 +206,7 @@ export async function cancelComplete() {
 export async function complete(command: string, position: number) {
     await cancelComplete()
     completionSignal = new AbortController()
-    let json;
+    let json: JSON;
     try {
         const resp = await fetch("/complete", {
             method: "POST",

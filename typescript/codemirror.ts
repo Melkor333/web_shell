@@ -13,22 +13,7 @@ import {
 
 import { CompletionContext, autocompletion, moveCompletionSelection } from "@codemirror/autocomplete"
 //import {cancelComplete, complete, submit, Log} from "./web_shell"
-import { BaseWidget, Terminal } from "./web_shell";
-
-function handleSubmit(view: EditorView, log: Log): boolean {
-    const command = view.state.doc.toString()
-    if (!command) {
-        return false
-    }
-
-    readonly = true
-    submit(command).then((out) => {
-        view.dispatch({ changes: { from: 0, to: view.state.doc.toString().length, insert: '' } })
-        readonly = false
-        log(command, out);
-    })
-    return true
-}
+import { BaseWidget, Terminal, Command } from "./web_shell";
 
 async function shellComplete(context: CompletionContext) {
     //context.addEventListener("abort", cancelComplete)
@@ -40,9 +25,9 @@ async function shellComplete(context: CompletionContext) {
     return complete(command, pos)
 }
 
-let readonly = false
+var readonly = false
 
-function updateInfo(term: Terminal) {
+function syncPromptWithTerminal(term: Terminal) {
     return EditorState.transactionExtender.of((update: ViewUpdate) => {
         if (update.docChanged)
             term.prompt = update.state.doc.toString()
@@ -52,6 +37,12 @@ function updateInfo(term: Terminal) {
 export class CodemirrorWidget extends BaseWidget {
     name = "CodemirrorWidget";
     view: EditorView;
+    readonly;
+
+    run() {
+        this.readonly = true;
+        this.term.runCommand(Command.Run);
+    }
 
     constructor(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean) {
         super(term, container, state, virtual);
@@ -60,10 +51,12 @@ export class CodemirrorWidget extends BaseWidget {
             override: [shellComplete],
         })
 
+        let that = this;
+        this.readonly = false;
         // handle Enter key
         // TODO: Use Command
         const runCommand: KeyBinding =
-            { key: "Enter", run: (v: EditorView) => { return handleSubmit(v, log) }, shift: insertNewline }
+            { key: "Enter", run: () => { that.run(); return true }, shift: insertNewline }
         // TODO: Thing
         // handle Tab key
 
@@ -81,12 +74,12 @@ export class CodemirrorWidget extends BaseWidget {
                 keymap.of([runCommand, runComplete]),
                 keymap.of(defaultKeymap),
                 // completion function
-                webshellCompletion,
-                EditorState.readOnly.of(readonly),
+                //webshellCompletion,
+                EditorState.readOnly.of(that.readonly),
                 StreamLanguage.define(shell),
                 basicSetup,
                 syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-                updateInfo(term)
+                syncPromptWithTerminal(term)
             ]
         })
 
@@ -96,18 +89,17 @@ export class CodemirrorWidget extends BaseWidget {
         })
         let runButton = document.createElement("button")
         runButton.setAttribute("type", "submit")
-        runButton.setAttribute("id", "RunButton")
+        runButton.setAttribute("id", "CodemirrorRunButton")
         runButton.innerHTML = "Run";
-        el.append(runButton)
+        el.append(runButton);
         // TODO:
-        //document.addEventListener("click", (event)=>{
-        //    event.preventDefault();
-        //    const target = event.target.closest("#RunButton"); // Or any other selector.
-        //    if (target) {
-        //        return handleSubmit(view, log)
-        //    }
-        //});
+        document.addEventListener("click", (event) => {
+            event.preventDefault();
+            that.run();
+        });
         //document.addEventListener("readystatechange", () => { view.focus() })
         this.view = view
     }
 }
+
+

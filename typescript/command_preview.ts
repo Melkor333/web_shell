@@ -9,7 +9,7 @@ export class CommandPreviewWidget extends BaseWidget {
         super(term, container, state, virtual);
         var that = this;
         this.rootHtmlElement.innerHTML = "<pre>" + term.prompt + "</pre>";
-        term.addPromptListener((p: string) => { that.rootHtmlElement.innerHTML = "<pre>" + p + "</pre>"; return p });
+        term.addListeners({ PromptUpdate: [(p: string) => { that.rootHtmlElement.innerHTML = "<pre>" + p + "</pre>"; return p }] });
     }
 }
 
