@@ -2,6 +2,7 @@ import { CodemirrorWidget } from "./codemirror";
 import { CommandPreviewWidget } from "./command_preview";
 import { Terminal } from "./web_shell";
 import { SimpleLogWidget } from "./simple_log";
+import { XtermWidget } from "./xterm";
 
 //import { SimpleLogWidget } from "./simple_log";
 import { createSimplePrompt } from "./simple_prompt";
@@ -21,6 +22,7 @@ const term = new Terminal(layoutElement);
 // Maybe create a TerminalWidget type?
 // And learn how to resolve a type by "filling in" a variable
 term.registerWidget(CodemirrorWidget);
+term.registerWidget(XtermWidget);
 term.registerWidget(SimpleLogWidget);
 term.registerWidget(CommandPreviewWidget);
 //term.registerWidget(SimpleLogWidget);
