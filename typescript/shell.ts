@@ -15,12 +15,13 @@ const addMenuItemElement = document.querySelector('#addMenuItem');
 const layoutElement: HTMLElement = document.querySelector('#layoutContainer');
 
 const term = new Terminal(layoutElement);
-term.registerWidget(CommandPreviewWidget);
-term.registerWidget(SimpleLogWidget);
+// TODO: the following should be an implementation of a BaseWidget
+// But we added `term` to the constructor
+// It's a "BaseWidgetCreator" in some sense...
+// Maybe create a TerminalWidget type?
+// And learn how to resolve a type by "filling in" a variable
 term.registerWidget(CodemirrorWidget);
+term.registerWidget(SimpleLogWidget);
+term.registerWidget(CommandPreviewWidget);
 //term.registerWidget(SimpleLogWidget);
 term.init();
-term.addWidget("CodemirrorWidget");
-term.addWidget("CommandPreviewWidget");
-term.addWidget("SimpleLogWidget");
-

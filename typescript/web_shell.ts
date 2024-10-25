@@ -108,11 +108,18 @@ export class Terminal {
     }
 
     // Include a wrapper which links the Terminal
-    registerWidget(widget: WidgetConstructor) {
+    registerWidget(widget: BaseWidget) {
         var that = this;
+        const menu = document.querySelector('#menuContainer');
+        let el = document.createElement('li');
+        el.innerHTML = widget.name;
+        el.id = widget.name;
+        el.addEventListener('click', (_) => that.addWidget(widget.name));
+
         this.goldenLayout.registerComponentFactoryFunction(widget.name, (container, state, virtual) => {
             return new widget(that, container, state, virtual);
         });
+        menu.append(el);
     };
 
     addWidget(name: string) {
