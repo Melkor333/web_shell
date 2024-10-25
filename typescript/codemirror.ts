@@ -91,12 +91,12 @@ export class CodemirrorWidget extends BaseWidget {
         runButton.setAttribute("type", "submit")
         runButton.setAttribute("id", "CodemirrorRunButton")
         runButton.innerHTML = "Run";
-        el.append(runButton);
-        // TODO:
-        document.addEventListener("click", (event) => {
+        runButton.addEventListener("click", (event) => {
             event.preventDefault();
             that.run();
         });
+        el.append(runButton);
+        // TODO:
         //document.addEventListener("readystatechange", () => { view.focus() })
         this.view = view
     }
