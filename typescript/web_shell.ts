@@ -7,6 +7,7 @@ import { ComponentContainer, LayoutConfig, GoldenLayout } from "golden-layout/sr
 export type CommandOut = {
     Dir?: string,
     Stdout?: string,
+    RawStdout?: string,
     Stderr?: string,
     Err?: error
 }

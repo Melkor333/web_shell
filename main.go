@@ -76,9 +76,10 @@ type Shell interface {
 }
 
 type CommandOut struct {
-	Dir            string
-	Stdout, Stderr string
-	Err            error
+	Dir                  string
+	Stdout, Stderr       string
+	RawStdout            string
+	Err                  error
 }
 
 func main() {
@@ -204,6 +205,7 @@ func Run(req io.Reader) (CommandOut, error) {
 
 	output.Dir = shell.Dir()
 	output.Stdout = string(terminal.Render(stdout.Bytes()))
+	output.RawStdout = stdout.String()
 	output.Stderr = stderr.String()
 	output.Err = err
 	return output, nil

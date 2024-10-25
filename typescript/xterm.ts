@@ -13,7 +13,7 @@ export class XtermWidget extends BaseWidget {
         super(term, container, state, virtual);
         // TODO: load custom js & css dynamically here somehow
         let that = this;
-        var xterm = new Xterm();
+        var xterm = new Xterm({ convertEol: true });
         xterm.open(this.rootHtmlElement);
         that.xterm = xterm;
         that.prompt = ">>>> ";
@@ -22,7 +22,7 @@ export class XtermWidget extends BaseWidget {
             PostRun: [(term: Terminal, i: number): Boolean => {
                 const command = term.commands[i][0]
                 const output = term.commands[i][1]
-                that.xterm.write(that.prompt + command + '\n' + output.Stdout + output.Stderr);
+                that.xterm.write(that.prompt + command + '\n' + output.RawStdout + output.Stderr);
                 return true;
             }]
         })
