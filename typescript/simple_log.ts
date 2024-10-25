@@ -16,6 +16,7 @@ export class SimpleLogWidget extends BaseWidget {
                 }
             }
         });
+        this.rootHtmlElement.parentElement.style.setProperty('overflow-y', "scroll");
         let that = this;
 
         term.addListeners({

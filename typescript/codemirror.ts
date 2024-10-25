@@ -12,12 +12,13 @@ import {
 } from "@codemirror/language"
 
 import { CompletionContext, autocompletion, moveCompletionSelection } from "@codemirror/autocomplete"
-//import {cancelComplete, complete, submit, Log} from "./web_shell"
+import { cancelComplete, complete, submit, Log } from "./web_shell"
 import { BaseWidget, Terminal, Command } from "./web_shell";
 
 async function shellComplete(context: CompletionContext) {
-    //context.addEventListener("abort", cancelComplete)
+    context.addEventListener("abort", cancelComplete)
     const command = context.state.doc.toString()
+    console.log(command)
     const pos = context.pos
     if (command.length == 0) {
         return null
@@ -74,7 +75,7 @@ export class CodemirrorWidget extends BaseWidget {
                 keymap.of([runCommand, runComplete]),
                 keymap.of(defaultKeymap),
                 // completion function
-                //webshellCompletion,
+                webshellCompletion,
                 EditorState.readOnly.of(that.readonly),
                 StreamLanguage.define(shell),
                 basicSetup,
