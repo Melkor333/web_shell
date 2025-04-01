@@ -77,7 +77,7 @@ type Command struct {
 	CommandLine string
 	// Should become ring buffers with length at some point I guess
 	Stdout, Stderr, Status string
-	Err                    error
+	err                    error
 	Id                     int
 	ctx                    context.Context
 	cancel                 context.CancelFunc
@@ -168,12 +168,12 @@ func Run(req io.Reader) Command {
 	// check errors
 	command.CommandLine = buf.String()
 
-	go shell.Run(&command)
-
 	command.Stdout = ""
 	command.Stderr = ""
 	command.Status = "running"
-	command.Err = nil
+	command.err = nil
+	go shell.Run(&command)
+
 	return command
 }
 

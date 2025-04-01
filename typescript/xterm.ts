@@ -20,9 +20,9 @@ export class XtermWidget extends BaseWidget {
 
         term.addListeners({
             PostRun: [(term: Terminal, i: number): Boolean => {
-                const command = term.commands[i][0]
-                const output = term.commands[i][1]
-                that.xterm.write(that.prompt + command + '\n' + output.RawStdout + output.Stderr);
+                const command = term.commands[i]
+                console.log(command)
+                that.xterm.write(that.prompt + command.CommandLine + '\n' + command.Stdout + command.Stderr);
                 return true;
             }]
         })

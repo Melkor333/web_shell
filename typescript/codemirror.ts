@@ -3,7 +3,7 @@ import { JsonValue } from "golden-layout";
 import { ComponentContainer } from "golden-layout/src/index";
 import { ViewPlugin, ViewUpdate, EditorView, KeyBinding, keymap } from "@codemirror/view"
 import { basicSetup } from "codemirror"
-import { defaultKeymap, insertNewline } from "@codemirror/commands"
+import { defaultKeymap, indentLess, indentMore, insertNewline, insertTab } from "@codemirror/commands"
 import { shell } from "@codemirror/legacy-modes/mode/shell"
 import {
     StreamLanguage,
@@ -13,7 +13,7 @@ import {
 
 import { CompletionContext, autocompletion, moveCompletionSelection } from "@codemirror/autocomplete"
 import { cancelComplete, complete, submit, Log } from "./web_shell"
-import { BaseWidget, Terminal, Command } from "./web_shell";
+import { BaseWidget, Terminal, WebCommand } from "./web_shell";
 
 async function shellComplete(context: CompletionContext) {
     context.addEventListener("abort", cancelComplete)
@@ -42,7 +42,7 @@ export class CodemirrorWidget extends BaseWidget {
 
     run() {
         this.readonly = true;
-        this.term.runCommand(Command.Run);
+        this.term.runCommand(WebCommand.Run);
     }
 
     constructor(term: Terminal, container: ComponentContainer, state: JsonValue, virtual: boolean) {
@@ -54,13 +54,9 @@ export class CodemirrorWidget extends BaseWidget {
 
         let that = this;
         this.readonly = false;
-        // handle Enter key
-        // TODO: Use Command
+
         const runCommand: KeyBinding =
             { key: "Enter", run: () => { that.run(); return true }, shift: insertNewline }
-        // TODO: Thing
-        // handle Tab key
-
         const runComplete: KeyBinding =
         {
             key: "Tab",

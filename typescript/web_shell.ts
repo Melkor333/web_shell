@@ -4,24 +4,35 @@ import "golden-layout/dist/css/themes/goldenlayout-light-theme.css";
 import { ComponentContainer, LayoutConfig, GoldenLayout } from "golden-layout/src/index";
 
 // An already finished command
-export type CommandOut = {
-    Dir?: string,
+export type Command = {
+    CommandLine: string,
     Stdout?: string,
-    RawStdout?: string,
     Stderr?: string,
+    Status?: string,
+    Id: number,
+    RawStdout?: string,
     Err?: error
 }
 
-export function TestCommandOut(json: any): json is CommandOut {
-    if ((json.hasOwnProperty('Dir') && typeof (json.Dir) == 'string') &&
-        // Only one of the two are required
-        ((json.hasOwnProperty('Stdout') && typeof (json.Stdout) == 'string') ||
-            (json.hasOwnProperty('Sterr') && typeof (json.Stderr) == 'string'))) {
+export function TestCommand(json: any): json is Command {
+    if (!(json.hasOwnProperty('Id') && typeof (json.Id) == 'number')) {
+        console.log("Command has no Id Property");
+        console.log(json);
+        return false;
+    }
+    if (!(json.hasOwnProperty('CommandLine') && typeof (json.CommandLine) == 'string')) {
+        console.log("Command has no CommandLine Property");
+        return false;
+    }
+    if
+        ((json.hasOwnProperty('Stdout') && typeof (json.Stdout) == 'string') &&
+        (json.hasOwnProperty('Stderr') && typeof (json.Stderr) == 'string')) {
         return true;
     }
     if (json.hasOwnProperty('Err') && json.Err.hasOwnProperty('Text') && typeof (json.Err.Text) == 'string') {
         return true;
     }
+    console.log("Command is missing an Err or stdout/stderr")
     return false;
 }
 
@@ -75,7 +86,8 @@ interface AllTerminalListeners {
 
 type TerminalListeners = Partial<AllTerminalListeners>;
 
-export enum Command {
+// Commands that can be executed by the TS Terminal class
+export enum WebCommand {
     Run,
 }
 
@@ -90,7 +102,7 @@ export class Terminal {
     private p: string;
     promptListeners: ((n: string) => string | undefined)[];
     listeners: AllTerminalListeners;
-    commands: [string, CommandOut][];
+    commands: Command[];
 
     constructor(public layoutElement: HTMLElement, layout: LayoutConfig = defaultLayout,) {
         // TODO: Maybe this needs some decoupling. E.g. Pass in the Layout. Allow multiple Terms in the same layout, etc.?
@@ -148,11 +160,11 @@ export class Terminal {
         }
     }
 
-    runCommand(command: Command) {
-        if (command === Command.Run) {
+    runCommand(command: WebCommand) {
+        if (command === WebCommand.Run) {
             console.log("running command ", command)
-            return this.run()
         }
+        return this.run()
     }
 
     // TODO: Make this a "generic" command
@@ -163,13 +175,22 @@ export class Terminal {
             return;
         }
 
-        submit(p).then((out) => {
-            var i = that.commands.push([p, out]) - 1;
-            for (const l of this.listeners.PostRun) {
-                console.log(l)
-                l(that, i)
-            }
-        })
+        // Run command
+        submit(p)
+            // Store returned command
+            .then((command) => { var i = that.commands.push(command) - 1; return i })
+            // Fetch for updates
+            .then(async (i) => {
+                that.commands[i] = await fetchCommandUpdate(that.commands[i])
+                return i
+            })
+            .then((i) => {
+                console.log(that.commands[i]);
+                for (const l of that.listeners.PostRun) {
+                    console.log(l)
+                    l(that, i)
+                }
+            })
     }
 
     init() {
@@ -177,7 +198,7 @@ export class Terminal {
     }
 }
 
-export async function submit(command: string): Promise<CommandOut> {
+export async function submit(command: string): Promise<Command> {
     if (!command) {
         return;
     };
@@ -194,8 +215,36 @@ export async function submit(command: string): Promise<CommandOut> {
     }
     console.log(json)
     //var out = JSON.parse(json)
-    if ((TestCommandOut(json))) { return json }
-    return { Err: { Text: "Bad data from backend" } };
+    if ((TestCommand(json))) { return json }
+    return { CommandLine: command, Id: -1, Err: { Text: "Bad data from backend" } };
+}
+
+// As long as a command isn't "done", it'll have to be updated
+export async function fetchCommandUpdate(command: Command): Promise<Command> {
+    while (true) {
+        console.log("checking /status")
+        console.log(command)
+        const resp = await fetch("/status", {
+            method: "POST",
+            body: JSON.stringify(command.Id)
+        });
+        console.log(resp);
+        var json = await resp.json();
+        // Optional: Add a delay to prevent excessive requests
+        if (!(TestCommand(json))) {
+            json.Status = "json parsing failure";
+            console.log("json parsin failure!");
+            command.Err = { Text: "Bad data from backend" };
+            command.Id = -1
+            return command
+        }
+        if (json.Status !== 'running') {
+            console.log('Finished!');
+            break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return json
 }
 
 export async function cancel() {

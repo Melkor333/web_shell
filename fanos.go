@@ -129,7 +129,7 @@ func (s *FANOSShell) Run(command *Command) error {
 			buf := new(strings.Builder)
 			io.Copy(buf, command.stderr)
 			command.Stderr = buf.String()
-			log.Println(command.Stderr)
+			//log.Println(command.Stderr)
 			commMu.Unlock()
 		}()
 	} else {
@@ -150,7 +150,6 @@ func (s *FANOSShell) Run(command *Command) error {
 			buf := new(strings.Builder)
 			io.Copy(buf, command.stderr)
 			command.Stderr = buf.String()
-			log.Println(command.Stderr)
 			commMu.Unlock()
 		}()
 	}
@@ -159,7 +158,6 @@ func (s *FANOSShell) Run(command *Command) error {
 	// ------------------
 	// Send command and FDs via FANOS
 	// ------------------
-	log.Println(int(_stderr.Fd()))
 	rights := syscall.UnixRights(int(command.stdin.Fd()), int(_stdout.Fd()), int(_stderr.Fd()))
 	var buf bytes.Buffer
 	buf.WriteString("EVAL ")
@@ -192,7 +190,7 @@ func (s *FANOSShell) Run(command *Command) error {
 		return err
 	}
 	//log.Println(msg)
-	command.Status = "Done"
+	command.Status = "done"
 	log.Println("Command is done")
 	log.Println(command.Id)
 

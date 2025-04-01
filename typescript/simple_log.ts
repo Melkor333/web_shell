@@ -21,11 +21,10 @@ export class SimpleLogWidget extends BaseWidget {
 
         term.addListeners({
             PostRun: [(term: Terminal, i: number): Boolean => {
-                const command = term.commands[i][0]
-                const output = term.commands[i][1]
-                let wrapper = that.createLogElement(command);
+                const command = term.commands[i]
+                let wrapper = that.createLogElement(command.CommandLine);
                 wrapper.open = true;
-                if (output.Err) {
+                if (command.Err) {
                     wrapper.className = "failed";
                 }
                 function addHtml(className: string, value: string) {
@@ -45,14 +44,14 @@ export class SimpleLogWidget extends BaseWidget {
                         wrapper.append(pre);
                     }
                 }
-                addHtml("stdout", output.Stdout)
-                addPre("stderr", output.Stderr)
-                addPre("err", output.Err && output.Err.Text)
+                addHtml("stdout", command.Stdout)
+                addPre("stderr", command.Stderr)
+                addPre("err", command.Err && command.Err.Text)
                 //if (output.Dir) {
                 //    that.getElementById("dir").textContent = output.Dir
                 //}
                 //console.log(output);
-                that.scrollingElement.scrollTop = document.scrollingElement.scrollHeight;
+                wrapper.scrollTop = document.scrollingElement.scrollHeight;
                 return true;
             }]
         })
