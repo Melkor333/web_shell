@@ -17,21 +17,18 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
-	"github.com/buildkite/terminal-to-html/v3"
-	"github.com/creack/pty"
+	"strings"
+	//"github.com/buildkite/terminal-to-html/v3"
 	"github.com/evanw/esbuild/pkg/api"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"strconv"
 	"sync"
-	"syscall"
 )
 
 var (
@@ -69,17 +66,20 @@ type CompletionResult struct {
 }
 
 type Shell interface {
-	StdIO(*os.File, *os.File, *os.File) error
-	Run(context.Context, io.Reader) error
+	//StdIO(*os.File, *os.File, *os.File) error
+	Run(Command) error
 	Complete(context.Context, CompletionReq) (*CompletionResult, error)
 	Dir() string
 }
 
-type CommandOut struct {
-	Dir                  string
-	Stdout, Stderr       string
-	RawStdout            string
-	Err                  error
+type Command struct {
+	CommandLine            string
+	Stdout, Stderr, Status string
+	Err                    error
+	Id                     int64
+	ctx                    context.Context
+	cancel                 context.CancelFunc
+	stdin, stdout, stderr  *os.File
 }
 
 func main() {
@@ -117,19 +117,21 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *gosh {
-		shell, err = NewGoShell()
-	} else if *oil {
-		shell, err = NewFANOSShell()
-	} else {
-		shell, err = NewBashShell()
-	}
+	// if *gosh {
+	// 	shell, err = NewGoShell()
+	// } else if *oil {
+	// 	shell, err = NewFANOSShell()
+	// } else {
+	// 	shell, err = NewBashShell()
+	// }
+
+	shell, err = NewFANOSShell()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	http.HandleFunc("/run", HandleRun)
-	http.HandleFunc("/complete", HandleComplete)
+	//http.HandleFunc("/complete", HandleComplete)
 	http.HandleFunc("/cancel", HandleCancel)
 	http.Handle("/", http.FileServer(http.Dir("./web")))
 	log.Fatal(http.ListenAndServe(*host+":"+strconv.Itoa(*port), nil))
@@ -137,86 +139,39 @@ func main() {
 
 var runMu sync.Mutex
 var runCancel context.CancelFunc = func() {}
+var idCount int64
 
-func Run(req io.Reader) (CommandOut, error) {
-	var output CommandOut
+func ProcessOutputs(stdin io.Writer, stdout io.Reader, stderr io.Reader, id int) {
+
+}
+
+// Create a command from the request and pass it to the shell
+// Also generate the ID for the command
+func Run(req io.Reader) Command {
+	var command Command
+
 	runMu.Lock()
 	defer runMu.Unlock()
-	var stdout, stderr bytes.Buffer
-	var runCtx context.Context
 
-	runCtx, runCancel = context.WithCancel(context.Background())
-	defer runCancel()
+	command.Id = idCount
+	idCount += 1
+	log.Println(idCount)
+	buf := new(strings.Builder)
+	io.Copy(buf, req)
+	// check errors
+	command.CommandLine = buf.String()
 
-	ptmx, pts, err := pty.Open()
-	if err != nil {
-		log.Println(err)
-		return output, err
-	}
-	defer func() {
-		ptmx.Close()
-		pts.Close()
-	}()
-	go io.Copy(&stdout, ptmx)
+	go shell.Run(command)
 
-	var pipe *os.File
-	if *fifo {
-		dir := os.TempDir()
-		pipeName := path.Join(dir, "errpipe")
-		syscall.Mkfifo(pipeName, 0600)
-		// If you open only the read side, then you need to open with O_NONBLOCK
-		// and clear that flag after opening.
-		//	pipe, err := os.OpenFile(pipeName, os.O_RDONLY|syscall.O_NONBLOCK, 0600)
-		pipe, err = os.OpenFile(pipeName, os.O_RDWR, 0600)
-		if err != nil {
-			log.Println(err)
-			return output, err
-		}
-		defer func() {
-			pipe.Close()
-			os.Remove(pipeName)
-			os.Remove(dir)
-		}()
-		go io.Copy(&stderr, pipe)
-	} else {
-		var rdPipe *os.File
-		rdPipe, pipe, err = os.Pipe()
-		if err != nil {
-			log.Println(err)
-			return output, err
-		}
-		go func() {
-			io.Copy(&stderr, rdPipe)
-			rdPipe.Close()
-			pipe.Close()
-		}()
-	}
-
-	// Reset stdio of runner before running a new command
-	err = shell.StdIO(nil, pts, pipe)
-	if err != nil {
-		log.Println(err)
-		return output, err
-	}
-	err = shell.Run(runCtx, req)
-	if err != nil {
-		log.Println(err)
-	}
-
-	output.Dir = shell.Dir()
-	output.Stdout = string(terminal.Render(stdout.Bytes()))
-	output.RawStdout = stdout.String()
-	output.Stderr = stderr.String()
-	output.Err = err
-	return output, nil
+	command.Stdout = ""
+	command.Stderr = ""
+	command.Status = "running"
+	command.Err = nil
+	return command
 }
 
 func HandleRun(w http.ResponseWriter, req *http.Request) {
-	output, err := Run(req.Body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	output := Run(req.Body)
 	o, err := json.Marshal(output)
 	if err != nil {
 		log.Println(err)
@@ -225,7 +180,6 @@ func HandleRun(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
-
 }
 
 var compCancel context.CancelFunc = func() {}
