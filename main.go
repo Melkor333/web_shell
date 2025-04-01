@@ -17,6 +17,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -36,7 +37,7 @@ var (
 	port  = flag.Int("port", 3000, "Port at which to run the server over HTTP")
 	gosh  = flag.Bool("gosh", false, "Use the sh package instead of bash")
 	oil   = flag.Bool("oil", false, "Use oil instead of bash")
-	fifo  = flag.Bool("fifo", true, "Use named fifo instead of anonymous pipe")
+	fifo  = flag.Bool("fifo", false, "Use named fifo instead of anonymous pipe")
 	debug = flag.Bool("debug", false, "Watch and live reload typescript")
 	build = flag.Bool("buildonly", false, "build the typescript and exit")
 )
@@ -67,26 +68,33 @@ type CompletionResult struct {
 
 type Shell interface {
 	//StdIO(*os.File, *os.File, *os.File) error
-	Run(Command) error
+	Run(*Command) error
 	Complete(context.Context, CompletionReq) (*CompletionResult, error)
 	Dir() string
 }
 
 type Command struct {
-	CommandLine            string
+	CommandLine string
+	// Should become ring buffers with length at some point I guess
 	Stdout, Stderr, Status string
 	Err                    error
-	Id                     int64
+	Id                     int
 	ctx                    context.Context
 	cancel                 context.CancelFunc
-	stdin, stdout, stderr  *os.File
+	stdin                  *os.File
+	stdout, stderr         *bytes.Buffer
 }
+
+var commands []*Command
+var commMu sync.Mutex
 
 func main() {
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var err error
+
+	commands = make([]*Command, 10)
 
 	// Bundle javascript
 	buildCtx, err := api.Context(api.BuildOptions{
@@ -133,13 +141,12 @@ func main() {
 	http.HandleFunc("/run", HandleRun)
 	//http.HandleFunc("/complete", HandleComplete)
 	http.HandleFunc("/cancel", HandleCancel)
+	http.HandleFunc("/status", HandleStatus)
 	http.Handle("/", http.FileServer(http.Dir("./web")))
 	log.Fatal(http.ListenAndServe(*host+":"+strconv.Itoa(*port), nil))
 }
 
-var runMu sync.Mutex
 var runCancel context.CancelFunc = func() {}
-var idCount int64
 
 func ProcessOutputs(stdin io.Writer, stdout io.Reader, stderr io.Reader, id int) {
 
@@ -150,18 +157,18 @@ func ProcessOutputs(stdin io.Writer, stdout io.Reader, stderr io.Reader, id int)
 func Run(req io.Reader) Command {
 	var command Command
 
-	runMu.Lock()
-	defer runMu.Unlock()
+	commMu.Lock()
+	command.Id = len(commands)
+	commands = append(commands, &command)
+	commMu.Unlock()
 
-	command.Id = idCount
-	idCount += 1
-	log.Println(idCount)
+	log.Println(command.Id)
 	buf := new(strings.Builder)
 	io.Copy(buf, req)
 	// check errors
 	command.CommandLine = buf.String()
 
-	go shell.Run(command)
+	go shell.Run(&command)
 
 	command.Stdout = ""
 	command.Stderr = ""
@@ -173,6 +180,29 @@ func Run(req io.Reader) Command {
 func HandleRun(w http.ResponseWriter, req *http.Request) {
 	output := Run(req.Body)
 	o, err := json.Marshal(output)
+	if err != nil {
+		log.Println(err)
+	}
+	_, err = w.Write(o)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func HandleStatus(w http.ResponseWriter, req *http.Request) {
+	buf := new(strings.Builder)
+	io.Copy(buf, req.Body)
+	number, err := strconv.Atoi(buf.String())
+	if err != nil {
+		log.Println(err)
+	}
+	command := commands[number]
+	//commMu.Lock()	//buf = new(strings.Builder)
+	//io.Copy(buf, command.stdout)
+
+	//command.Stdout = buf.String()
+	//commMu.Unlock()
+	o, err := json.Marshal(command)
 	if err != nil {
 		log.Println(err)
 	}
@@ -194,8 +224,8 @@ func HandleComplete(w http.ResponseWriter, req *http.Request) {
 	if compCancel != nil {
 		compCancel()
 	}
-	runMu.Lock()
-	defer runMu.Unlock()
+	commMu.Lock()
+	defer commMu.Unlock()
 	var compCtx context.Context
 
 	compCtx, compCancel = context.WithCancel(context.Background())
